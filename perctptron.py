@@ -37,3 +37,4 @@ print(sigmoid(np.matmul(weights, X)))
 
 # cost for network:
 # (predicted - real)^2 + b 
+
