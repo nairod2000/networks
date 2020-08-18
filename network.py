@@ -23,19 +23,24 @@ class Network:
         return activations
 
     def back_prop(self, neurons, expected):
+        gradients = list()
         cost_to_L = self.cost_derivative(neurons[-1], expected)
         n = 0
-        current_gradient = cost_to_L
         while n < len(self.weights):
-            activation_to_z = self.sigmoid_prime(self.weights[-1])
-            current_gradient *= activation_to_z
+            current_gradient = cost_to_L
+            activation_to_z1 = self.sigmoid_prime(self.weights[-1] * neurons[-2])
+            current_gradient *= activation_to_z1
             if n != 0:
                 for i in range(n):
-                    z_to_activation = self.weights[-1 - i] # not just -1, needs to walk back the line.
-                    activation_to_z = self.sigmoid_prime(self.weights[-1 - i]) # same
+                    z_to_activation = self.weights[-1 - i]
+                    activation_to_z = self.sigmoid_prime(self.weights[-2 - i] * neurons[-3 - i])
                     current_gradient *= (z_to_activation * activation_to_z)
-            current_gradient *= neurons[-1 - n]
+            current_gradient *= neurons[-2 - n]
             n += 1
+            gradients.append(current_gradient)
+            if n == len(self.weights):
+                break
+        return gradients
 
     @staticmethod
     def sigmoid(X):
