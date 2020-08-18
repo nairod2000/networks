@@ -38,3 +38,6 @@ print(sigmoid(np.matmul(weights, X)))
 # cost for network:
 # (predicted - real)^2 + b 
 
+some_list = [1, 2, 3]
+for i in reversed(range(len(some_list))):
+    print(i)
