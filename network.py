@@ -65,7 +65,7 @@ class Network:
             current_gradient = np.matmul(current_gradient, neurons[-2 - n].T)
             n += 1
             gradients.append(current_gradient)
-        return gradients
+        return list(reversed(gradients))
 
     @staticmethod
     def sigmoid(X):
@@ -78,8 +78,13 @@ class Network:
     def cost_derivative(X, y):
         return (X - y)
 
-    def train(self, lr, epocs):
-        pass
+    def train(self, lr, epocs, examples, real_values):
+        samples = len(real_values)
+        for i in range(samples):
+            neurons = self.forward(examples[i])
+            deltas = self.back_prop(neurons, real_values[i])
+            for j in range(len(deltas)):
+                self.weights[j] -= lr * deltas[j].T
 
     def predict(self):
         pass
