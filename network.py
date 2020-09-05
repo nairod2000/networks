@@ -47,9 +47,11 @@ class Network:
         return:
         - the gradients of all the layers weights
         '''
+        # todo: need to implement the backprop for 
         expected = np.array(expected)
         expected_vector = np.reshape(expected, (expected.shape[0], 1))
-        gradients = list()
+        weights_delta = list()
+        biases_delta = list()
         cost_to_L = self.cost_derivative(neurons[-1], expected_vector)
         n = 0
         while n < len(self.weights):
@@ -62,11 +64,11 @@ class Network:
                     current_gradient = np.matmul(z_to_activation, current_gradient)
                     activation_to_z = self.sigmoid_prime(np.matmul(self.weights[-2 - i].T, neurons[-3 - i]))
                     current_gradient *= activation_to_z
+            biases_delta.append(current_gradient)
             current_gradient = np.matmul(neurons[-2 - n], current_gradient.T)
-
-            n += 1 
-            gradients.append(current_gradient)
-        return list(reversed(gradients))
+            weights_delta.append(current_gradient)
+            n += 1
+        return (list(reversed(weights_delta)), list(reversed(biases_delta)))
 
     @staticmethod
     def sigmoid(X):
@@ -83,12 +85,14 @@ class Network:
         samples = len(real_values)
         for i in range(samples):
             neurons = self.forward(examples[i])
-            deltas = self.back_prop(neurons, real_values[i])
+            weights_deltas, biases_deltas = self.back_prop(neurons, real_values[i])
             for j in range(len(deltas)):
-                self.weights[j] -= lr * deltas[j].T
+                self.weights[j] -= lr * weights_deltas[j]
+                self.biases[j] -= lr * biases_deltas[j]
 
-    def predict(self):
-        pass
+    def predict(self, X):
+        activations = self.forward(X)
+        return activations[-1]
 
 
 if __name__ == '__main__':
