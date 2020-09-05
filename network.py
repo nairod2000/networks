@@ -4,7 +4,7 @@ import numpy as np
 # ex: should layers be a flexible thing, should the input layer count as a layer, how to represent
 # amount of neurons in each layer etc.
 
-class Network:
+class Network: 
     def __init__(self, sizes):
         self.layers = len(sizes)
         self.sizes = sizes
@@ -62,8 +62,9 @@ class Network:
                     current_gradient = np.matmul(z_to_activation, current_gradient)
                     activation_to_z = self.sigmoid_prime(np.matmul(self.weights[-2 - i].T, neurons[-3 - i]))
                     current_gradient *= activation_to_z
-            current_gradient = np.matmul(current_gradient, neurons[-2 - n].T)
-            n += 1
+            current_gradient = np.matmul(neurons[-2 - n], current_gradient.T)
+
+            n += 1 
             gradients.append(current_gradient)
         return list(reversed(gradients))
 
@@ -78,7 +79,7 @@ class Network:
     def cost_derivative(X, y):
         return (X - y)
 
-    def train(self, lr, epocs, examples, real_values):
+    def train(self, lr, examples, real_values):
         samples = len(real_values)
         for i in range(samples):
             neurons = self.forward(examples[i])
@@ -91,19 +92,6 @@ class Network:
 
 
 if __name__ == '__main__':
-    np.random.seed(1)
-    network = Network([10, 5, 4, 3])
-    X = np.random.randint(0, 4, (10, 1))
-    activations = network.forward(X)
-    print(len(activations))
-    #print('neurons')
-    #[print(x.shape) for x in activations]
-    #print('--------')
-    print('weights')
-    [print(x.shape) for x in network.weights]
-    #print('--------', '\n', 'backprop notes')
-    deltas = network.back_prop(activations, [1, 0, 0])
-    print('-------')
-    print('deltas')
-    [print(x.shape) for x in deltas]
-    #print(len(deltas))
+    network = Network([5, 4, 3])
+    activations = network.forward(np.array([[3], [2], [0], [-1], [1]]))
+    deltas = network.back_prop(activations, np.array([[1], [0], [0]]))
