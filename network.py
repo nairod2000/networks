@@ -1,15 +1,13 @@
 import numpy as np
+from load_data import *
 
-# need to look up important abstractions for a network to have. 
-# ex: should layers be a flexible thing, should the input layer count as a layer, how to represent
-# amount of neurons in each layer etc.
 
 class Network: 
     def __init__(self, sizes):
         self.layers = len(sizes)
         self.sizes = sizes
-        self.weights = [np.random.randint(-2, 3, (j, i)) for j, i in zip(sizes[:-1], sizes[1:])]
-        self.biases = [np.random.randint(-2, 3, (i, 1)) for i in sizes[1:]]
+        self.weights = [np.array(np.random.randint(-2, 3, (j, i)), dtype='float64') for j, i in zip(sizes[:-1], sizes[1:])]
+        self.biases = [np.array(np.random.randint(-2, 3, (i, 1)), dtype='float64') for i in sizes[1:]]
 
     def forward(self, X):
         '''
@@ -86,7 +84,7 @@ class Network:
         for i in range(samples):
             neurons = self.forward(examples[i])
             weights_deltas, biases_deltas = self.back_prop(neurons, real_values[i])
-            for j in range(len(deltas)):
+            for j in range(len(weights_deltas)):
                 self.weights[j] -= lr * weights_deltas[j]
                 self.biases[j] -= lr * biases_deltas[j]
 
@@ -96,6 +94,13 @@ class Network:
 
 
 if __name__ == '__main__':
-    network = Network([5, 4, 3])
-    activations = network.forward(np.array([[3], [2], [0], [-1], [1]]))
-    deltas = network.back_prop(activations, np.array([[1], [0], [0]]))
+    data = load_data()
+    expected_vector = produce_expected_vectors(data)
+    data = reshape_input_vector(data)
+    network = Network([784, 16, 10])
+    network.train(.05, data, expected_vector)
+
+    test = data[1]
+    expected_value = 0
+    print(network.predict(test))
+    print(0)
