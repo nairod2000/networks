@@ -17,6 +17,14 @@ class Layer:
     '''
     Every layer object is expected to be a two dimensional tensor.
     '''
+    differentiable_operations = 0
+    operation_history = dict()
+
+    @classmethod
+    def add_to_history(cls, obj, result):
+        cls.differentiable_operations += 1
+        operation_number = Layer.differentiable_operations
+        cls.operation_history[operation_number] = {'object': obj, 'result': result}
 
     class Conv2D:
         def __init__(self):
@@ -45,73 +53,51 @@ class Layer:
         - should implement a backward function that uses the the history 
           to update weights and biases
         '''
-
-        linear_layers = 0
-        linear_data = dict()
-
         def __init__(self, D_in, D_out):
-            # initilize the instance data
-            self.gradients = list()
+            # initilize the weight and bias
             self.weight = np.random.randn(D_in, D_out)
             self.bias = np.random.randn(D_in, 1)
 
-            # Update class data
-            self.linear_layers += 1
-            self.linear_data[self.linear_layers] = {'weight': self.weight, 'bias': self.bias}
+        def __call__(self, X):
+            # Calculate forward pass
+            forward = self._forward(X)
+            # Add the operation object and its result to history 
+            Layer.add_to_history(self, forward)
 
-            self.id = self.linear_layers
+            return forward
 
-        def __call__(self, X, direction='f'):
-            if direction == 'f':
-                forward = self._forward(X)
-                self.linear_data[self.id]['forward'] = forward
-                return forward
-            elif direction == 'b':
-                return self._linear_derivative()
+        def linear_derivative(self):
+            # This is to be called by the optimizer object
+            pass
 
         def _forward(self, X):
             return np.multiply(self.weight, X) + self.bias
-
-        def _linear_derivative(self):
-            pass
             
 
-    class Activation:
-        def __init__(self, activation_type):
-            self.act_dict = {'sig': self._sigmoid}
-            self.div_dict = {'sig': self._sigmoid_derivative}
+    class Sigmoid:
+ 
+        def __call__(self, vector):
+            result = self._sigmoid(vector)
+            Layer.add_to_history(self, result)
+            return result
 
-            try:
-                self.activation = self.act_dict[activation_type]
-                self.derivative = self.div_dict[activation_type]
-            except AttributeError:
-                print(f'Activation has no attribute {activation_type}')
-
-
-        def __call__(self, vector, direction='f'):
-            if direction == 'f':
-                return self.activation(vector) 
-            elif direction == 'd':
-                return self.derivative(vector)
+        def sigmoid_derivative(self, X):
+            return self._sigmoid(X) / (1 - self._sigmoid)
 
         @staticmethod
         def _sigmoid(X):
             return 1 / (1 + np.exp(X))
-
-        def _sigmoid_derivative(self, X):
-            return self._sigmoid(X) / (1 - self._sigmoid)
 
 
 class Optimizer:
     '''
     This should be passed the model object (obj of Network class)
     '''
-    def __init__(self, model, activation, method):
-        self.model = model
-        self.model_activation = activation
-        self.method = method
+    def __init__(self):
+        pass
 
     def update(self, expected):
+        # when passing back
         pass
 
     @staticmethod
@@ -120,14 +106,14 @@ class Optimizer:
 
 
 class Network(Layer):
-    def __init__(self, activation: Callable[np.array, str]) -> None:
+    def __init__(self) -> None:
         super().__init__()
 
         self.layer1 = self.Conv2D()
         self.layer2 = self.MaxPool()
         self.layer3 = self.Conv2D()
-        self.layer4 = activation(self.Linear(784, 16))
-        self.layer5 = activation(self.Linear(16, 16))
+        self.layer4 = self.Sigmoid(self.Linear(784, 16))
+        self.layer5 = self.Sigmoid(self.Linear(16, 16))
 
     def forward(self, X):
         X = self.layer1(X)
