@@ -1,22 +1,19 @@
 import numpy as np 
 from typing import Callable
 
-
 '''
 flow:
-- will create a Network object that will be composed of Layer object
+- will create a Network object that will be composed of Layer objects
+- will create an optimizer object that inherits Layer information
 - will call forward on the model
-- the model will store necessary data to be optimized
-- will pass the model to the optimizer
-- optimizer updates model
+- the Layer class will store necessary data to be optimized
+- optimizer updates model using Layer data
 
-ToDo: Linear needs to contain what oporations were done on each forward pass.
+- repeat
 '''
 
 class Layer:
-    '''
-    Every layer object is expected to be a two dimensional tensor.
-    '''
+
     differentiable_operations = 0
     operation_history = dict()
 
@@ -44,14 +41,11 @@ class Layer:
 
     class Linear:
         '''
-        This subclass is for layers that will be fully connected. 
-        Is just a feedforward network.
+        This subclass is for layers that will be fully connected to next layer.
 
         - will randomly initialize weights and biases.
-        - will need a history of the operations done on it.
-        - __call__ is the forward function
-        - should implement a backward function that uses the the history 
-          to update weights and biases
+        - __call__ is the forward function (for the user)
+        - derivatives are used by the optimzer 
         '''
         def __init__(self, D_in, D_out):
             # initilize the weight and bias
@@ -66,7 +60,11 @@ class Layer:
 
             return forward
 
-        def linear_derivative(self):
+        def linear_derivative_weight(self):
+            # This is to be called by the optimizer object
+            pass
+
+        def linear_derivative_bias(self):
             # This is to be called by the optimizer object
             pass
 
@@ -75,7 +73,12 @@ class Layer:
             
 
     class Sigmoid:
- 
+        '''
+        This is the sigmoid activation funciton.
+
+        - __call__ is the forward function
+        - derivative is used by the optimizer
+        '''
         def __call__(self, vector):
             result = self._sigmoid(vector)
             Layer.add_to_history(self, result)
@@ -89,15 +92,14 @@ class Layer:
             return 1 / (1 + np.exp(X))
 
 
-class Optimizer:
+class Optimizer(Layer):
     '''
-    This should be passed the model object (obj of Network class)
-    '''
-    def __init__(self):
-        pass
+    Optimizer inherits the operation_history and uses the data to update the
+    model. 
 
-    def update(self, expected):
-        # when passing back
+    - __call__ is to be called when the user whishes to update the model.
+    '''
+    def __call__(self, expected):
         pass
 
     @staticmethod
