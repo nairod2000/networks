@@ -12,16 +12,25 @@ flow:
 - repeat
 '''
 
+# TODO: Implement back propagation
+# TODO: Implement MaxPool
+# TODO: Implement Conv2D
+
 class Layer:
 
     differentiable_operations = 0
     operation_history = dict()
+    gradients = dict()
 
     @classmethod
     def add_to_history(cls, obj, result):
         cls.differentiable_operations += 1
-        operation_number = Layer.differentiable_operations
+        operation_number = cls.differentiable_operations
         cls.operation_history[operation_number] = {'object': obj, 'result': result}
+
+    @classmethod
+    def add_to_gradients(cls):
+        pass
 
     class Conv2D:
         def __init__(self):
@@ -60,12 +69,20 @@ class Layer:
 
             return forward
 
-        def linear_derivative_weight(self):
-            # This is to be called by the optimizer object
+        def derivative(self):
+            # this is used by the optimizer object
+
+            # this will call the other two derivative functions 
             pass
 
-        def linear_derivative_bias(self):
-            # This is to be called by the optimizer object
+        def _linear_derivative_weight(self):
+            # when this is called, it should automaticly add the result 
+            # to a gradient dict
+            pass
+
+        def _linear_derivative_bias(self):
+            # when this is called, it should automaticly add the result 
+            # to a gradient dict
             pass
 
         def _forward(self, X):
@@ -84,8 +101,8 @@ class Layer:
             Layer.add_to_history(self, result)
             return result
 
-        def sigmoid_derivative(self, X):
-            return self._sigmoid(X) / (1 - self._sigmoid)
+        def derivative(self, X):
+            return self._sigmoid(X) / (1 - self._sigmoid(X))
 
         @staticmethod
         def _sigmoid(X):
@@ -99,7 +116,25 @@ class Optimizer(Layer):
 
     - __call__ is to be called when the user whishes to update the model.
     '''
-    def __call__(self, expected):
+    def __init__(self):
+        self.operations = Layer.operation_history
+        self.gradients = Layer.gradients
+
+    def get_gradients(self, expected):
+        num_operations = len(self.operations)
+        
+        last_layer_result = self.operations[num_operations]['result']
+        cost_to_activation = self.cost_derivative_SGD(last_layer_result, expected)
+
+        current_derivative = cost_to_activation
+        for oper_idx in range(num_operations, 0, -1):
+            # this should just chain back and the important gradients will be stored 
+            # automaticly. 
+            pass
+
+    def apply_gradients(self):
+        # will use the self.gradiets to update the gradients of linear objects 
+        # in Linear
         pass
 
     @staticmethod
