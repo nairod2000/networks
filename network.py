@@ -45,7 +45,6 @@ class Network:
         return:
         - the gradients of all the layers weights
         '''
-        # todo: need to implement the backprop for 
         expected = np.array(expected)
         expected_vector = np.reshape(expected, (expected.shape[0], 1))
         weights_delta = list()
@@ -66,7 +65,7 @@ class Network:
             current_gradient = np.matmul(neurons[-2 - n], current_gradient.T)
             weights_delta.append(current_gradient)
             n += 1
-        return (list(reversed(weights_delta)), list(reversed(biases_delta)))
+        return list(reversed(weights_delta)), list(reversed(biases_delta))
 
     @staticmethod
     def sigmoid(X):
@@ -79,28 +78,43 @@ class Network:
     def cost_derivative(X, y):
         return (X - y)
 
-    def train(self, lr, examples, real_values):
+    def train(self, lr, examples, real_values, epochs):
         samples = len(real_values)
-        for i in range(samples):
-            neurons = self.forward(examples[i])
-            weights_deltas, biases_deltas = self.back_prop(neurons, real_values[i])
-            for j in range(len(weights_deltas)):
-                self.weights[j] -= lr * weights_deltas[j]
-                self.biases[j] -= lr * biases_deltas[j]
+        for _ in range(epochs):
+            for i in range(samples):
+                neurons = self.forward(examples[i])
+                weights_deltas, biases_deltas = self.back_prop(neurons, real_values[i])
+                for j in range(len(weights_deltas)):
+                    self.weights[j] -= lr * weights_deltas[j]
+                    self.biases[j] -= lr * biases_deltas[j]
 
     def predict(self, X):
         activations = self.forward(X)
         return activations[-1]
+
+    def score_model(self, X, y):
+        # for each example, run forward, argmax on last activation
+        # if argmax == lable correct += 1 else wrong += 1
+        total_examples = len(X)
+        correct = 0
+        for i, example in enumerate(X):
+            activations = self.forward(example)
+            precieved_value = np.argmax(activations[-1])
+            real_value = np.argmax(y[i])
+            if precieved_value == real_value:
+                correct += 1
+        return correct / total_examples
 
 
 if __name__ == '__main__':
     data = load_data()
     expected_vector = produce_expected_vectors(data)
     data = reshape_input_vector(data)
-    network = Network([784, 16, 10])
-    network.train(.05, data, expected_vector)
+    network = Network([784, 16, 16, 10])
+    network.train(.001, data, expected_vector, 10)
 
-    test = data[1]
-    expected_value = 0
-    print(network.predict(test))
-    print(0)
+
+    test_data = load_test()
+    expected_vector = produce_expected_vectors(test_data)
+    test_data = reshape_input_vector(test_data)
+    print(f'Model score {network.score_model(test_data, expected_vector)}')
