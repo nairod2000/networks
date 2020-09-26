@@ -47,6 +47,14 @@ class Layer:
         cls.operation_history = dict()
         cls.gradients = dict()
 
+    @staticmethod
+    def is_row_vector(vector):
+        pass
+
+    @staticmethod
+    def convert_to_row_vector(vector):
+        pass
+
     class Conv2D:
         def __init__(self):
             pass
@@ -93,7 +101,7 @@ class Layer:
             self._linear_derivative_weight(grad, inpt)
 
         def _linear_derivative_weight(self, grad, inpt):
-            weight_grad = np.matmul(grad.T, inpt)
+            weight_grad = np.matmul(inpt, grad.T)
             Layer.gradients[self.operation_number]['weights'] = weight_grad
 
         def _linear_derivative_bias(self, grad):
@@ -101,10 +109,6 @@ class Layer:
 
         def _forward(self, X):
             return np.matmul(self.weight.T, X) + self.bias
-
-        @staticmethod
-        def is_row_vector(vector):
-            pass
             
 
     class Sigmoid:
@@ -147,11 +151,12 @@ class Optimizer(Layer):
         num_operations = len(self.operations)
         
         last_layer_result = self.operations[num_operations]['result']
-        cost_to_activation = self.cost_derivative_SGD(last_layer_result, expected)
+
+        cost_to_activation = self.cost_derivative_SGD(last_layer_result, expected.T)
 
         current_gradient = cost_to_activation
         for oper_idx in range(num_operations, 0, -2):
-            
+
             # get necessary objects and relavent data
             non_lin_operation = self.operations[oper_idx]
             non_lin_object = non_lin_operation['object']
@@ -160,7 +165,7 @@ class Optimizer(Layer):
 
             ## derivative from activation to linear eq
             act_to_lin = non_lin_object.derivative(non_lin_operation['input'])
-            
+
             # update gradient
             current_gradient *= act_to_lin
 
@@ -169,7 +174,8 @@ class Optimizer(Layer):
 
             if oper_idx != 2:
                 # derivative from linear eq to prev activation
-                prev_weight = self.operations[oper_idx-3]['object'].weight
+                #prev_weight = self.operations[oper_idx-3]['object'].weight
+                prev_weight = lin_object.weight
                 
                 # update gradient
                 current_gradient = np.matmul(prev_weight, current_gradient)
@@ -194,7 +200,7 @@ class Network(Layer):
         #self.layer2 = self.MaxPool()
         #self.layer3 = self.Conv2D()
         self.layer4 = self.Linear(784, 16)
-        self.layer5 = self.Linear(16, 16)
+        self.layer5 = self.Linear(16, 10)
 
     def forward(self, X):
         #X = self.layer1(X)
@@ -213,6 +219,8 @@ if __name__ == '__main__':
     for ex in range(1):
 
         model.forward(X_data[ex].T)
-        #print(model.operation_history)
 
         optimizer.get_gradients(y_data[ex])
+
+        ops = Layer.operation_history
+        grads = Layer.gradients
