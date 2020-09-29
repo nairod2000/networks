@@ -1,6 +1,7 @@
 import numpy as np 
 from data_manager import MNISTLoader
 
+np.random.seed(1)
 '''
 flow:
 - will create a Network object that will be composed of Layer objects
@@ -8,7 +9,6 @@ flow:
 - will call forward on the model
 - the Layer class will store necessary data to be optimized
 - optimizer updates model using Layer data
-
 - repeat
 '''
 
@@ -68,7 +68,6 @@ class Layer:
     class Linear:
         '''
         This subclass is for layers that will be fully connected to next layer.
-
         - will randomly initialize weights and biases.
         - __call__ is the forward function (for the user)
         - derivatives are used by the optimzer 
@@ -100,7 +99,9 @@ class Layer:
 
         def _linear_derivative_bias(self, grad):
             grad = np.sum(grad, axis=1)
+
             grad = grad[:, np.newaxis]
+
             Layer.gradients[self.operation_number]['bias'] = grad
 
         def _forward(self, X):
@@ -110,7 +111,6 @@ class Layer:
     class Sigmoid:
         '''
         This is the sigmoid activation funciton.
-
         - __call__ is the forward function
         - derivative is used by the optimizer
         '''
@@ -128,34 +128,36 @@ class Layer:
 
         @staticmethod
         def _sigmoid(X):
-            return 1 / (1 + np.exp(X))
+            return 1 / (1 + np.exp(-X))
 
 
 class Optimizer(Layer):
     '''
     Optimizer inherits the operation_history and uses the data to update the
     model. 
-
     - get_gradients gets the gradients for the necessary weights and biases
     - apply_gradients applies the gradients found in get_gradients
     '''
-    def __init__(self):
-        self.operations = Layer.operation_history
-        self.gradients = Layer.gradients
+    #def __init__(self):
+    #    self.operations = Layer.operation_history
+    #    self.gradients = Layer.gradients
 
-    def get_gradients(self, expected):#
-        num_operations = len(self.operations)
+    def get_gradients(self, expected):
+        #print(Layer.operation_history)
+        num_operations = len(Layer.operation_history)
         
         # derivative from cost to activation
-        last_layer_result = self.operations[num_operations]['result']
+        last_layer_result = Layer.operation_history[num_operations]['result']
         cost_to_activation = self.cost_derivative_SGD(last_layer_result, expected.T)
 
+
         current_gradient = cost_to_activation
+
         for oper_idx in range(num_operations, 0, -2):
             # get necessary objects and relavent data
-            non_lin_operation = self.operations[oper_idx]
+            non_lin_operation = Layer.operation_history[oper_idx]
             non_lin_object = non_lin_operation['object']
-            lin_operation = self.operations[oper_idx-1]
+            lin_operation = Layer.operation_history[oper_idx-1]
             lin_object = lin_operation['object']
 
             ## derivative from activation to linear eq
@@ -170,9 +172,11 @@ class Optimizer(Layer):
             if oper_idx != 2:
                 # derivative from linear eq to prev activation
                 prev_weight = lin_object.weight
-                
+
+
                 # update gradient
                 current_gradient = np.matmul(prev_weight, current_gradient)
+        #print('suc')
 
 
     def apply_gradients(self, lr):
@@ -194,16 +198,7 @@ class Optimizer(Layer):
 
     @staticmethod
     def cost_derivative_SGD(X, y):
-        try:
-            return (X - y)
-        except ValueError:
-            X_examples = X.shape[1]
-            y_examples = y.shape[1]
-            missing = X_examples - y_examples
-            dim = X.shape[0]
-            blank_ex = np.zeros((dim, missing))
-            y = np.append(y, blank_ex, axis=1)
-            return (X - y)
+        return (X - y)
 
     @staticmethod
     def clear_history():
@@ -221,41 +216,48 @@ class Network(Layer):
         #self.layer2 = self.MaxPool()
         #self.layer3 = self.Conv2D()
         self.layer4 = self.Linear(784, 16)
-        self.layer5 = self.Linear(16, 10)
+        self.layer5 = self.Linear(16, 16)
+        self.layer6 = self.Linear(16, 10)
 
     def forward(self, X):
         #X = self.layer1(X)
         #X = self.layer2(X)
         #X = self.layer3(X)
-        X = self.activation(self.layer4(X))
-        X = self.activation(self.layer5(X))
+        res1 = self.activation(self.layer4(X))
+        res2 = self.activation(self.layer5(res1))
+        res3 = self.activation(self.layer6(res2))
 
 
 if __name__ == '__main__':
     loader = MNISTLoader(1)
-    epochs = 1
+    epochs = 3
     X_train, y_train = loader.load_train()
     X_test, y_test = loader.load_test()
 
 
     model = Network()
     optimizer = Optimizer()
+
     for _ in range(epochs):
         for ex in range(len(X_train)):
 
             model.forward(X_train[ex].T)
 
             optimizer.get_gradients(y_train[ex])
+            #if ex % 41000 == 0:
+            #    print(Layer.gradients[3])
 
-            optimizer.apply_gradients(.1)
+
+            optimizer.apply_gradients(.01)
             optimizer.clear_history()
 
+    print('trained')
     correct = 0
     total = 0
     for ex in range(len(X_test)): # len(X_test)
         model.forward(X_test[ex].T)
         real = y_test[ex]
-        pred = Layer.operation_history[4]['result'].T
+        pred = Layer.operation_history[6]['result'].T
 
         real = real.argmax(axis=1)
         pred = pred.argmax(axis=1)
@@ -265,5 +267,6 @@ if __name__ == '__main__':
                 correct += 1
 
         optimizer.clear_history()
-
+    print(correct)
+    print(total)
     print(correct/ total)
