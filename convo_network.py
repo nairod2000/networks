@@ -12,7 +12,6 @@ flow:
 - repeat
 '''
 
-# TODO: Implement back propagation
 # TODO: Implement MaxPool
 # TODO: Implement Conv2D
 
@@ -130,6 +129,23 @@ class Layer:
         def _sigmoid(X):
             return 1 / (1 + np.exp(-X))
 
+    class Tanh:
+        def __init__(self):
+            self.operation_number = None
+
+        def __call__(self, vector):
+            result = self._tanh(vector)
+            self.operation_number = Layer.assign_order(self)
+            Layer.add_to_history(self, result, vector)
+            return result
+
+        def derivative(self, X):
+            return 1.0 - (np.square(self._tanh(X)))
+
+        @staticmethod
+        def _tanh(X):
+            return np.tanh(X)
+
 
 class Optimizer(Layer):
     '''
@@ -138,9 +154,6 @@ class Optimizer(Layer):
     - get_gradients gets the gradients for the necessary weights and biases
     - apply_gradients applies the gradients found in get_gradients
     '''
-    #def __init__(self):
-    #    self.operations = Layer.operation_history
-    #    self.gradients = Layer.gradients
 
     def get_gradients(self, expected):
         #print(Layer.operation_history)
@@ -149,7 +162,6 @@ class Optimizer(Layer):
         # derivative from cost to activation
         last_layer_result = Layer.operation_history[num_operations]['result']
         cost_to_activation = self.cost_derivative_SGD(last_layer_result, expected.T)
-
 
         current_gradient = cost_to_activation
 
@@ -173,10 +185,8 @@ class Optimizer(Layer):
                 # derivative from linear eq to prev activation
                 prev_weight = lin_object.weight
 
-
                 # update gradient
                 current_gradient = np.matmul(prev_weight, current_gradient)
-        #print('suc')
 
 
     def apply_gradients(self, lr):
@@ -210,7 +220,7 @@ class Optimizer(Layer):
 class Network(Layer):
     def __init__(self) -> None:
         super().__init__()
-        self.activation = self.Sigmoid()
+        self.activation = self.Tanh()
 
         #self.layer1 = self.Conv2D()
         #self.layer2 = self.MaxPool()
@@ -223,16 +233,17 @@ class Network(Layer):
         #X = self.layer1(X)
         #X = self.layer2(X)
         #X = self.layer3(X)
-        res1 = self.activation(self.layer4(X))
-        res2 = self.activation(self.layer5(res1))
-        res3 = self.activation(self.layer6(res2))
+        X = self.activation(self.layer4(X))
+        X = self.activation(self.layer5(X))
+        X = self.activation(self.layer6(X))
 
 
 if __name__ == '__main__':
-    loader = MNISTLoader(1)
-    epochs = 3
+    loader = MNISTLoader(64)
+    epochs = 10
     X_train, y_train = loader.load_train()
     X_test, y_test = loader.load_test()
+    learning_rate = 0.022
 
 
     model = Network()
@@ -241,14 +252,11 @@ if __name__ == '__main__':
     for _ in range(epochs):
         for ex in range(len(X_train)):
 
-            model.forward(X_train[ex].T)
+            model.forward(X_train[ex].T / 100)
 
             optimizer.get_gradients(y_train[ex])
-            #if ex % 41000 == 0:
-            #    print(Layer.gradients[3])
 
-
-            optimizer.apply_gradients(.01)
+            optimizer.apply_gradients(learning_rate)
             optimizer.clear_history()
 
     print('trained')
