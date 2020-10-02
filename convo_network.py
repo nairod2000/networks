@@ -1,5 +1,6 @@
 import numpy as np 
 from data_manager import MNISTLoader
+import cv2
 
 np.random.seed(1)
 '''
@@ -49,19 +50,84 @@ class Layer:
         pass
 
     class Conv2D:
-        def __init__(self):
-            pass
+        '''
+        Inputs
+        - img_dim: needs to be tuple of (depth, height, width)
+        - filter_d: needs to be a tuple of (depth, height, width)
+        '''
+        def __init__(self, in_dim, filter_d, channels, padding=0, stride=1):
+            # Filter dimensions
+            self.f_d, self.f_h, self.f_w = filter_d
+            # Input dimensions
+            self.in_d, self.in_h, self.in_w = in_dim
+            # Weights and biases
+            self.weight = np.random.rand(self.f_d, channels, self.f_h, self.f_w)
+            self.bias = np.random.randn(self.f_d, 1, 1, 1)
+            # Misc
+            self.operation_number = None
+            self.padding = padding
+            self.stride = stride
 
         def __call__(self, X):
+            # Calculate forward pass
+            forward = self._convolve(X)
+            # Add the operation object and its result to history
+            self.operation_number = Layer.assign_order(self) 
+            Layer.add_to_history(self, forward, X)
+
+            return forward
+
+        def derivative(self, grad, inpt):
+            # this is used by the optimizer object
+            Layer.gradients[self.operation_number] = dict()
+            self._conv_derivative_bias(grad)
+            self._conv_derivative_weight(grad, inpt)
+
+        def _conv_derivative_weight(self, grad, inpt):
+            #Layer.gradients[self.operation_number]['weights'] = weight_grad
             pass
 
-
-    class MaxPool:
-        def __init__(self):
+        def _conv_derivative_bias(self, grad):
+            #Layer.gradients[self.operation_number]['bias'] = grad
             pass
 
-        def __call__(self):
-            pass
+        def _convolve(self, X):
+
+            out_w, out_h = self.output_dim((self.in_h, self.in_w))
+            out_d = self.weight.shape[0]
+            out = np.empty((out_d ,out_h, out_w))
+
+            for i in range(self.in_w-2):
+                for j in range(self.in_h-2):
+                    # section of intrest
+                    soi = X[:, i:i+3, j:j+3]
+
+                    res = np.multiply(soi, self.weight)
+
+                    sums = np.sum(res, axis=1)
+
+                    for k, arr in enumerate(sums):
+                        out[k, j, i] = np.sum(arr)
+
+            return out
+
+
+        def output_dim(self, inpt_dim):
+            height, width = inpt_dim
+            out_w = self._calculation(width)
+            out_h = self._calculation(height)
+            return int(out_w), int(out_h)
+
+
+        def _calculation(self, inpt_dim):
+            return ((inpt_dim + 2*self.padding - self.f_h) / self.stride) + 1
+
+        def _forward(self, X):
+            X = self._convolve(X)
+            #print(self.weight.shape)
+            #print(x.shape)
+            #quit()
+            return np.matmul(self.weight, X) + self.bias
 
 
     class Linear:
@@ -131,7 +197,7 @@ class Layer:
 
     class Tanh:
         def __init__(self):
-            self.operation_number = None
+            self.operation_number = None # Gets assigned when called
 
         def __call__(self, vector):
             result = self._tanh(vector)
@@ -164,6 +230,7 @@ class Optimizer(Layer):
         cost_to_activation = self.cost_derivative_SGD(last_layer_result, expected.T)
 
         current_gradient = cost_to_activation
+        print(current_gradient.shape)
 
         for oper_idx in range(num_operations, 0, -2):
             # get necessary objects and relavent data
@@ -187,6 +254,9 @@ class Optimizer(Layer):
 
                 # update gradient
                 current_gradient = np.matmul(prev_weight, current_gradient)
+                print(current_gradient.shape)
+                quit()
+
 
 
     def apply_gradients(self, lr):
@@ -222,59 +292,34 @@ class Network(Layer):
         super().__init__()
         self.activation = self.Tanh()
 
-        #self.layer1 = self.Conv2D()
+        self.layer1 = self.Conv2D((1, 28, 28), (1, 3, 3), 1)
         #self.layer2 = self.MaxPool()
-        #self.layer3 = self.Conv2D()
-        self.layer4 = self.Linear(784, 16)
-        self.layer5 = self.Linear(16, 16)
-        self.layer6 = self.Linear(16, 10)
+        #self.layer3 = self.Conv2D((2, 3, 3), 2)
+        self.layer4 = self.Linear(676, 10)
+        #self.layer5 = self.Linear(16, 16)
+        #self.layer6 = self.Linear(16, 10)
 
     def forward(self, X):
-        #X = self.layer1(X)
+        X = self.activation(self.layer1(X))
         #X = self.layer2(X)
         #X = self.layer3(X)
+        X = X.flatten()[:, np.newaxis]
         X = self.activation(self.layer4(X))
-        X = self.activation(self.layer5(X))
-        X = self.activation(self.layer6(X))
+        #X = self.activation(self.layer5(X))
+        #X = self.activation(self.layer6(X))
 
 
 if __name__ == '__main__':
-    loader = MNISTLoader(64)
-    epochs = 10
+    loader = MNISTLoader(1)
     X_train, y_train = loader.load_train()
-    X_test, y_test = loader.load_test()
-    learning_rate = 0.022
-
-
     model = Network()
     optimizer = Optimizer()
+    X = X_train[0]
+    x = np.reshape(X, (28, 28))
+    x = x[np.newaxis, :, :]
 
-    for _ in range(epochs):
-        for ex in range(len(X_train)):
-
-            model.forward(X_train[ex].T / 100)
-
-            optimizer.get_gradients(y_train[ex])
-
-            optimizer.apply_gradients(learning_rate)
-            optimizer.clear_history()
-
-    print('trained')
-    correct = 0
-    total = 0
-    for ex in range(len(X_test)): # len(X_test)
-        model.forward(X_test[ex].T)
-        real = y_test[ex]
-        pred = Layer.operation_history[6]['result'].T
-
-        real = real.argmax(axis=1)
-        pred = pred.argmax(axis=1)
-        for i in range(len(real)):
-            total += 1
-            if real[i] == pred[i]:
-                correct += 1
-
-        optimizer.clear_history()
-    print(correct)
-    print(total)
-    print(correct/ total)
+    model.forward(x)
+    #print(Layer.operation_history[2]['result'].shape)
+    #print()
+    #print(Layer.operation_history[2]['result'].flatten().shape)
+    optimizer.get_gradients(y_train[0])
