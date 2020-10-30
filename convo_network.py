@@ -12,7 +12,9 @@ flow:
 - repeat
 '''
 
-# TODO: Implement MaxPool
+# TODO Give documentation to everything
+# TODO make a read me
+# TODO: finish MaxPool
 # TODO: Implement Conv2D
 
 class Layer:
@@ -35,6 +37,11 @@ class Layer:
         cls.operation_history[operation_number] = dict()
         return operation_number
 
+    @classmethod
+    def clear_history(cls):
+        cls.differentiable_operations = 0
+        cls.operation_history = dict()
+        cls.gradients = dict()
 
     @classmethod
     def add_to_gradients(cls):
@@ -48,206 +55,194 @@ class Layer:
     def convert_to_row_vector(vector):
         pass
 
-    class Conv2D:
+class Conv2D:
+    '''
+    Inputs
+    - img_dim: needs to be tuple of (depth, height, width)
+    - filter_d: needs to be a tuple of (depth, height, width)
+    '''
+    def __init__(self, in_dim, filter_d, channels, padding=0, stride=1):
+        # Misc
+        self.operation_number = None
+        self.padding = padding
+        self.stride = stride
+        # Filter dimensions
+        self.f_d, self.f_h, self.f_w = filter_d
+        # Input dimensions
+        self.in_d, self.in_h, self.in_w = in_dim
+        # Output dimensions
+        #self.out_w, self.out_h = self.output_dim((self.in_h, self.in_w))
+        self.out_d = self.f_d
+        # Weights and biases
+        self.weight = np.random.rand(self.f_d, channels, self.f_h, self.f_w)
+        self.bias = 0
+        #self.bias = np.random.randn(self.f_d, 1, 1, 1)
+
+    def __call__(self, X):
+        # Calculate forward pass
+        forward = self._convolve(X, self.weight)
+        # Add the operation object and its result to history
+        self.operation_number = Layer.assign_order(self)
+        Layer.add_to_history(self, forward, X)
+        return forward
+
+    def derivative(self, grad, inpt):
+        # Check dims of grad
+        if self._is_row_vector(grad):
+            grad = self._revert_from_row_vector(grad)
+        # this is used by the optimizer object
+        Layer.gradients[self.operation_number] = dict()
+        self._conv_derivative_bias(grad) # Will do this one next
+        self._conv_derivative_weight(grad, inpt)
+
+    def _conv_derivative_weight(self, inpt, grad):
         '''
-        Inputs
-        - img_dim: needs to be tuple of (depth, height, width)
-        - filter_d: needs to be a tuple of (depth, height, width)
+        The derivative with respect to the weight is a convolution of the input by the grad
         '''
-        def __init__(self, in_dim, filter_d, channels, padding=0, stride=1):
-            # Misc
-            self.operation_number = None
-            self.padding = padding
-            self.stride = stride
-            # Filter dimensions
-            self.f_d, self.f_h, self.f_w = filter_d
-            # Input dimensions
-            self.in_d, self.in_h, self.in_w = in_dim
-            # Output dimensions
-            #self.out_w, self.out_h = self.output_dim((self.in_h, self.in_w))
-            self.out_d = self.f_d
+        weight_grad = self._convolve(grad, inpt)
+        Layer.gradients[self.operation_number]['weights'] = weight_grad
 
-            # Weights and biases
-            self.weight = np.random.rand(self.f_d, channels, self.f_h, self.f_w)
-            self.bias = 0
-            #self.bias = np.random.randn(self.f_d, 1, 1, 1)
+    def _conv_derivative_bias(self, grad):
+        Layer.gradients[self.operation_number]['bias'] = 0
 
-
-        def __call__(self, X):
-            # Calculate forward pass
-            forward = self._convolve(X, self.weight)
-            # Add the operation object and its result to history
-            self.operation_number = Layer.assign_order(self)
-            Layer.add_to_history(self, forward, X)
-
-            return forward
-
-        def derivative(self, grad, inpt):
-            # Check dims of grad
-            if self._is_row_vector(grad):
-                grad = self._revert_from_row_vector(grad)
-            # this is used by the optimizer object
-            Layer.gradients[self.operation_number] = dict()
-            self._conv_derivative_bias(grad) # Will do this one next
-            self._conv_derivative_weight(grad, inpt)
-
-        def _conv_derivative_weight(self, inpt, grad):
-            '''
-            The derivative with respect to the weight is a convolution of the input by the grad
-            '''
-            weight_grad = self._convolve(grad, inpt)
-            Layer.gradients[self.operation_number]['weights'] = weight_grad
-
-
-        def _conv_derivative_bias(self, grad):
-            Layer.gradients[self.operation_number]['bias'] = 0
-
-        def _convolve(self, inpt, convolver):
-            '''
-            Problem:
-            - This only works for convolving the filter with the input.
-            
-            - It needs to be able to convolve the input by the gradient
-            '''
-            c_h, c_w = self.get_height_width(convolver)
-            in_h, in_w = self.get_height_width(inpt)
-
-            out_h, out_w = self.output_dim((in_h, in_w), (c_h, c_w))
-            out_d = convolver.shape[0]
-
-            # This needs to be calculated for each pass
-            # self.f_h will need to be something like convolver.shape[-2]
-            
-            out = np.empty((out_d, out_h, out_w))
-
-            
-            for i in range(out_w):
-                for j in range(out_h):
-                    # section of intrest
-                    soi = inpt[:, i:i+c_w, j:j+c_h]
-
-                    res = np.multiply(soi, convolver)
-
-                    sums = np.sum(res, axis=1)
-
-                    for k, arr in enumerate(sums):
-                        out[k, j, i] = np.sum(arr)
-            return out
-
-        def output_dim(self, inpt_dim, conv_dim):
-            height, width = inpt_dim
-            c_height, c_width = conv_dim
-            out_w = self._calculation(width, c_width)
-            out_h = self._calculation(height, c_height)
-            return int(out_w), int(out_h)
-
-        def _calculation(self, inpt_dim, conv_dim):
-            return ((inpt_dim + 2 * self.padding - conv_dim) / self.stride) + 1
-
-        @staticmethod
-        def get_height_width(X):
-            dims = X.shape
-            height, width = dims[-2], dims[-2]
-            return height, width
-
-        @staticmethod
-        def _is_row_vector(vector):
-            dims = len(vector.shape)
-            if dims == 2:
-                return True
-            else:
-                return False
-
-        def _revert_from_row_vector(self, vect):
-            vect = np.reshape(vect, (self.out_d, self.out_h, self.out_w))
-            return vect
-
-
-    class Linear:
+    def _convolve(self, inpt, convolver):
         '''
-        This subclass is for layers that will be fully connected to next layer.
-        - will randomly initialize weights and biases.
-        - __call__ is the forward function (for the user)
-        - derivatives are used by the optimzer 
+        Problem:
+        - This only works for convolving the filter with the input.
+        
+        - It needs to be able to convolve the input by the gradient
         '''
-        def __init__(self, D_in, D_out):
-            # initilize the weight and bias
-            self.weight = np.random.randn(D_in, D_out)
-            self.bias = np.random.randn(D_out, 1)
-            self.operation_number = None
+        c_h, c_w = self.get_height_width(convolver)
+        in_h, in_w = self.get_height_width(inpt)
+        out_h, out_w = self.output_dim((in_h, in_w), (c_h, c_w))
+        out_d = convolver.shape[0]
+        # This needs to be calculated for each pass
+        # self.f_h will need to be something like convolver.shape[-2]
+        
+        out = np.empty((out_d, out_h, out_w))
+        
+        for i in range(out_w):
+            for j in range(out_h):
+                # section of intrest
+                soi = inpt[:, i:i+c_w, j:j+c_h]
+                res = np.multiply(soi, convolver)
+                sums = np.sum(res, axis=1)
+                for k, arr in enumerate(sums):
+                    out[k, j, i] = np.sum(arr)
+        return out
 
-        def __call__(self, vector):
-            # Calculate forward pass
-            result = self._forward(vector)
-            # Add the operation object and its result to history
-            self.operation_number = Layer.assign_order(self) 
-            Layer.add_to_history(self, result, vector)
+    def output_dim(self, inpt_dim, conv_dim):
+        height, width = inpt_dim
+        c_height, c_width = conv_dim
+        out_w = self._calculation(width, c_width)
+        out_h = self._calculation(height, c_height)
+        return int(out_w), int(out_h)
 
-            return result
+    def _calculation(self, inpt_dim, conv_dim):
+        return ((inpt_dim + 2 * self.padding - conv_dim) / self.stride) + 1
 
-        def derivative(self, grad, inpt):
-            # this is used by the optimizer object
-            Layer.gradients[self.operation_number] = dict()
-            self._linear_derivative_bias(grad)
-            self._linear_derivative_weight(grad, inpt)
+    @staticmethod
+    def get_height_width(X):
+        dims = X.shape
+        height, width = dims[-2], dims[-2]
+        return height, width
 
-        def _linear_derivative_weight(self, grad, inpt):
-            weight_grad = np.matmul(inpt, grad.T)
-            Layer.gradients[self.operation_number]['weights'] = weight_grad
+    @staticmethod
+    def _is_row_vector(vector):
+        dims = len(vector.shape)
+        if dims == 2:
+            return True
+        else:
+            return False
 
-        def _linear_derivative_bias(self, grad):
-            grad = np.sum(grad, axis=1)
+    def _revert_from_row_vector(self, vect):
+        vect = np.reshape(vect, (self.out_d, self.out_h, self.out_w))
+        return vect
 
-            grad = grad[:, np.newaxis]
 
-            Layer.gradients[self.operation_number]['bias'] = grad
+class Linear:
+    '''
+    This subclass is for layers that will be fully connected to next layer.
+    - will randomly initialize weights and biases.
+    - __call__ is the forward function (for the user)
+    - derivatives are used by the optimzer 
+    '''
+    def __init__(self, D_in, D_out):
+        # initilize the weight and bias
+        self.weight = np.random.randn(D_in, D_out)
+        self.bias = np.random.randn(D_out, 1)
+        self.operation_number = None
 
-        def _forward(self, X):
-            result = np.matmul(self.weight.T, X) + self.bias
-            return result
+    def __call__(self, vector):
+        # Calculate forward pass
+        result = self._forward(vector)
+        # Add the operation object and its result to history
+        self.operation_number = Layer.assign_order(self) 
+        Layer.add_to_history(self, result, vector)
+        return result
+
+    def derivative(self, grad, inpt):
+        # this is used by the optimizer object
+        Layer.gradients[self.operation_number] = dict()
+        self._linear_derivative_bias(grad)
+        self._linear_derivative_weight(grad, inpt)
+
+    def _linear_derivative_weight(self, grad, inpt):
+        weight_grad = np.matmul(inpt, grad.T)
+        Layer.gradients[self.operation_number]['weights'] = weight_grad
+
+    def _linear_derivative_bias(self, grad):
+        grad = np.sum(grad, axis=1)
+        grad = grad[:, np.newaxis]
+        Layer.gradients[self.operation_number]['bias'] = grad
+
+    def _forward(self, X):
+        result = np.matmul(self.weight.T, X) + self.bias
+        return result
             
 
-    class Sigmoid:
-        '''
-        This is the sigmoid activation funciton.
-        - __call__ is the forward function
-        - derivative is used by the optimizer
-        '''
-        def __init__(self):
-            self.operation_number = None # gets assigned when called
+class Sigmoid:
+    '''
+    This is the sigmoid activation funciton.
+    - __call__ is the forward function
+    - derivative is used by the optimizer
+    '''
+    def __init__(self):
+        self.operation_number = None # gets assigned when called
 
-        def __call__(self, vector):
-            result = self._sigmoid(vector)
-            self.operation_number = Layer.assign_order(self)
-            Layer.add_to_history(self, result, vector)
-            return result
+    def __call__(self, vector):
+        result = self._sigmoid(vector)
+        self.operation_number = Layer.assign_order(self)
+        Layer.add_to_history(self, result, vector)
+        return result
 
-        def derivative(self, X):
-            return self._sigmoid(X) * (1 - self._sigmoid(X))
+    def derivative(self, X):
+        return self._sigmoid(X) * (1 - self._sigmoid(X))
 
-        @staticmethod
-        def _sigmoid(X):
-            return 1 / (1 + np.exp(-X))
-
-    class Tanh:
-        def __init__(self):
-            self.operation_number = None # Gets assigned when called
-
-        def __call__(self, vector):
-            result = self._tanh(vector)
-            self.operation_number = Layer.assign_order(self)
-            Layer.add_to_history(self, result, vector)
-            return result
-
-        def derivative(self, X):
-            return 1.0 - (np.square(self._tanh(X)))
-
-        @staticmethod
-        def _tanh(X):
-            return np.tanh(X)
+    @staticmethod
+    def _sigmoid(X):
+        return 1 / (1 + np.exp(-X))
 
 
-class Optimizer(Layer):
+class Tanh:
+    def __init__(self):
+        self.operation_number = None # Gets assigned when called
+
+    def __call__(self, vector):
+        result = self._tanh(vector)
+        self.operation_number = Layer.assign_order(self)
+        Layer.add_to_history(self, result, vector)
+        return result
+
+    def derivative(self, X):
+        return 1.0 - (np.square(self._tanh(X)))
+
+    @staticmethod
+    def _tanh(X):
+        return np.tanh(X)
+
+
+class Optimizer:
     '''
     Optimizer inherits the operation_history and uses the data to update the
     model. 
@@ -256,10 +251,7 @@ class Optimizer(Layer):
     '''
 
     def get_gradients(self, expected):
-        #print(Layer.operation_history)
         num_operations = len(Layer.operation_history)
-        #print(num_operations)
-        #quit()
         
         # derivative from cost to activation
         last_layer_result = Layer.operation_history[num_operations]['result']
@@ -326,24 +318,18 @@ class Optimizer(Layer):
     def cost_derivative_SGD(X, y):
         return (X - y)
 
-    @staticmethod
-    def clear_history():
-        Layer.differentiable_operations = 0
-        Layer.operation_history = dict()
-        Layer.gradients = dict()
 
-
-class Network(Layer):
+class Network:
     def __init__(self) -> None:
         super().__init__()
-        self.activation = self.Tanh()
+        self.activation = Tanh()
 
         #self.layer1 = self.Conv2D((1, 28, 28), (8, 3, 3), 1)
         #self.layer2 = self.MaxPool()
         #self.layer3 = self.Conv2D((2, 3, 3), 2)
-        self.layer4 = self.Linear(784, 16)
-        self.layer5 = self.Linear(16, 16)
-        self.layer6 = self.Linear(16, 10)
+        self.layer4 = Linear(784, 16)
+        self.layer5 = Linear(16, 16)
+        self.layer6 = Linear(16, 10)
 
     def forward(self, X):
         #X = self.activation(self.layer1(X))
@@ -374,7 +360,7 @@ if __name__ == '__main__':
             optimizer.get_gradients(y_train[ex])
 
             optimizer.apply_gradients(learning_rate)
-            optimizer.clear_history()
+            Layer.clear_history()
 
 #if __name__ == '__main__':
 #    loader = MNISTLoader(2)
@@ -419,7 +405,7 @@ if __name__ == '__main__':
             if real[i] == pred[i]:
                 correct += 1
 
-        optimizer.clear_history()
+        Layer.clear_history()
     print(correct)
     print(total)
     print(correct/ total)
