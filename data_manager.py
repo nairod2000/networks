@@ -1,7 +1,6 @@
 import os
 import numpy as np
 from pandas import read_csv
-import pandas as pd
 
 np.random.seed(0)
 
