@@ -11,7 +11,7 @@ flow:
 - optimizer updates model using Layer data
 - repeat
 '''
-
+# BUG not adding to history
 # TODO Give documentation to everything
 # TODO make a read me
 # TODO: finish MaxPool
@@ -259,7 +259,7 @@ class Optimizer:
 
         current_gradient = cost_to_activation
 
-
+        #print(len(Layer.operation_history))
         for oper_idx in range(num_operations, 0, -2):
             # get necessary objects and relavent data
             non_lin_operation = Layer.operation_history[oper_idx]
@@ -303,7 +303,7 @@ class Optimizer:
             bias_delta = gradients[op]['bias']
 
             # apply deltas
-            if isinstance(lin_object, Layer.Conv2D):
+            if isinstance(lin_object, Conv2D):
                 weight_delta = weight_delta[:, np.newaxis, :, :]
             lin_object.weight -= (lr * weight_delta)
             lin_object.bias -= (lr * bias_delta)
@@ -348,7 +348,6 @@ if __name__ == '__main__':
     X_test, y_test = loader.load_test()
     learning_rate = 0.022
 
-
     model = Network()
     optimizer = Optimizer()
 
@@ -362,38 +361,10 @@ if __name__ == '__main__':
             optimizer.apply_gradients(learning_rate)
             Layer.clear_history()
 
-#if __name__ == '__main__':
-#    loader = MNISTLoader(2)
-#    epochs = 1
-#    X_train, y_train = loader.load_train()
-#    X_train = np.array(X_train)[:, :, np.newaxis, :]
-#
-#    X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], 28, 28))
-#
-#    X_test, y_test = loader.load_test()
-#    learning_rate = 0.01
-#
-#
-#    model = Network()
-#    optimizer = Optimizer()
-#
-#    for _ in range(epochs):
-#        for ex in range(len(X_train)):
-#            # X = np.reshape(X_train[ex], (28, 28)) / 100
-#            # X = X[np.newaxis, :, :]
-#            # model.forward(X)
-#
-#            optimizer.get_gradients(y_train[ex])
-#
-#            optimizer.apply_gradients(learning_rate)
-#            optimizer.clear_history()
-#            #quit()
-#
     print('trained')
     correct = 0
     total = 0
     for ex in range(len(X_test)): # len(X_test)
-        
         model.forward(X_test[ex].T)
         real = y_test[ex]
         pred = Layer.operation_history[6]['result'].T
