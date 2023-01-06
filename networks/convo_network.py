@@ -4,7 +4,7 @@ from data_manager import MNISTLoader
 from layer import Layer
 from linear import Linear
 from activations import Tanh
-from conv2d import Conv2D
+#from conv2d import Conv2D
 from optimizer import Optimizer
 
 np.random.seed(1)
